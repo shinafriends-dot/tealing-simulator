@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Buffer Array — Curtailment Absorption Simulator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        navy: '#0D1B2A',
+                        panel: '#16283C',
+                        accent: '#00C896',
+                        danger: '#EF4444',
+                        gridblue: '#3B82F6'
+                    },
+                    fontFamily: {
+                        sans: ['system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #0D1B2A;
+            color: #F3F4F6;
+        }
+
+        /* Custom Slider Styling */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 24px;
+            width: 24px;
+            border-radius: 50%;
+            background: #00C896;
+            cursor: pointer;
+            margin-top: -10px;
+            box-shadow: 0 0 12px rgba(0, 200, 150, 0.6);
+            transition: transform 0.1s;
+        }
+        input[type=range]::-webkit-slider-thumb:active {
+            transform: scale(1.1);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #374151;
+            border-radius: 2px;
+        }
+
+        /* Animations */
+        .flow-path {
+            fill: none;
+            stroke-width: 6;
+            stroke-dasharray: 12 12;
+            animation: flowDash 1s linear infinite;
+        }
+        @keyframes flowDash {
+            to { stroke-dashoffset: -24; }
+        }
+        
+        .pulse {
+            animation: pulseAnim 2s infinite;
+        }
+        @keyframes pulseAnim {
+            0% { filter: drop-shadow(0 0 5px rgba(0, 200, 150, 0.4)); }
+            50% { filter: drop-shadow(0 0 15px rgba(0, 200, 150, 0.8)); }
+            100% { filter: drop-shadow(0 0 5px rgba(0, 200, 150, 0.4)); }
+        }
+
+        .transition-colors { transition: stroke 0.3s ease, color 0.3s ease, background-color 0.3s ease; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center p-4 md:p-8">
+
+    <!-- Header -->
+    <header class="w-full max-w-5xl text-center mb-8">
+        <h1 class="text-3xl md:text-4xl font-bold text-white mb-2 tracking-tight">Smart Buffer Array — Tealing Substation Pilot</h1>
+        <p class="text-accent text-sm md:text-base font-medium">A Non-Wire Alternative for Scottish Grid Curtailment — Kayode Adediji, Tealing Grid Tech</p>
+    </header>
+
+    <div class="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- Section 1: Control Panel -->
+        <section class="bg-panel rounded-xl p-6 shadow-xl border border-gray-700 lg:col-span-1 flex flex-col justify-center">
+            <h2 class="text-xl font-bold text-white mb-6 border-b border-gray-600 pb-2">Live Grid Controls</h2>
+            
+            <div class="mb-8">
+                <div class="flex justify-between mb-2">
+                    <label class="text-sm font-medium text-gray-300">Scottish Offshore Wind Generation</label>
+                    <span id="genValue" class="text-accent font-bold">800 MW</span>
+                </div>
+                <input type="range" id="genSlider" min="0" max="1500" value="800">
+            </div>
+
+            <div>
+                <div class="flex justify-between mb-2">
+                    <label class="text-sm font-medium text-gray-300">Grid Export Capacity Limit</label>
+                    <span id="capValue" class="text-gridblue font-bold">400 MW</span>
+                </div>
+                <input type="range" id="capSlider" min="0" max="1500" value="400">
+            </div>
+            
+            <div class="mt-8 p-4 bg-gray-800 rounded-lg">
+                <div class="text-sm text-gray-400">Current Status</div>
+                <div id="statusText" class="text-lg font-bold mt-1 text-danger">400 MW Curtailed</div>
+            </div>
+        </section>
+
+        <!-- Section 2: Flow Visualisation -->
+        <section class="bg-panel rounded-xl p-6 shadow-xl border border-gray-700 lg:col-span-2 relative flex flex-col items-center justify-center min-h-[350px]">
+            <h2 class="text-xl font-bold text-white mb-4 absolute top-6 left-6">Live Flow Visualisation</h2>
+            
+            <!-- SVG Diagram -->
+            <svg class="w-full h-full mt-8" viewBox="0 0 600 300" preserveAspectRatio="xMidYMid meet">
+                
+                <!-- Main Grid Line -->
+                <path id="cablePath" d="M 100 100 L 500 100" class="flow-path transition-colors stroke-gridblue"></path>
+                
+                <!-- Curtailment / Buffer Line -->
+                <path id="bufferPath" d="M 300 100 L 300 220" class="flow-path transition-colors stroke-danger opacity-100"></path>
+
+                <!-- Wind Farm Node (Left) -->
+                <rect x="20" y="60" width="80" height="80" rx="8" fill="#1F2937" stroke="#9CA3AF" stroke-width="2"/>
+                <text x="60" y="100" fill="white" font-size="12" text-anchor="middle" font-weight="bold">WIND</text>
+                <text x="60" y="115" fill="#9CA3AF" font-size="10" text-anchor="middle">FARM</text>
+
+                <!-- Grid Node (Right) -->
+                <rect x="500" y="60" width="80" height="80" rx="8" fill="#1F2937" stroke="#3B82F6" stroke-width="2"/>
+                <text x="540" y="100" fill="white" font-size="12" text-anchor="middle" font-weight="bold">UK GRID</text>
+                <text id="gridImportText" x="540" y="115" fill="#3B82F6" font-size="10" text-anchor="middle font-bold">400 MW</text>
+
+                <!-- Smart Buffer Container Node (Bottom) -->
+                <g id="containerNode">
+                    <rect x="220" y="220" width="160" height="70" rx="4" fill="#1F2937" id="containerBox" class="transition-colors stroke-danger" stroke-width="2"/>
+                    <text id="containerTitle" x="300" y="240" fill="white" font-size="12" text-anchor="middle" font-weight="bold">WASTED ENERGY</text>
+                    <text id="containerMetrics1" x="300" y="255" fill="#EF4444" font-size="10" text-anchor="middle">400 MW Curtailed</text>
+                    <text id="containerMetrics2" x="300" y="270" fill="#EF4444" font-size="10" text-anchor="middle"></text>
+                </g>
+
+                <!-- Warning/Status Label -->
+                <rect id="warningBox" x="240" y="40" width="120" height="24" rx="4" fill="#EF4444" class="transition-colors"/>
+                <text id="warningText" x="300" y="56" fill="white" font-size="10" text-anchor="middle" font-weight="bold">CURTAILMENT ACTIVE</text>
+            </svg>
+        </section>
+
+        <!-- Section 3: Financial Dashboard -->
+        <section class="bg-panel rounded-xl p-6 shadow-xl border border-gray-700 lg:col-span-3">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-gray-600 pb-4 mb-6">
+                <h2 class="text-xl font-bold text-white">Financial & Public Impact Dashboard</h2>
+                
+                <!-- Toggle Switch -->
+                <div class="mt-4 md:mt-0 flex items-center bg-gray-800 rounded-full p-1 cursor-pointer" onclick="toggleBuffer()">
+                    <div id="toggleOff" class="px-4 py-1 rounded-full text-sm font-bold bg-danger text-white transition-all">Without Smart Buffer</div>
+                    <div id="toggleOn" class="px-4 py-1 rounded-full text-sm font-bold text-gray-400 transition-all">With Smart Buffer</div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <!-- Card 1 -->
+                <div class="bg-gray-800 p-4 rounded-lg border-l-4 border-gray-500" id="card1">
+                    <div class="text-sm text-gray-400 mb-1" id="label1">Curtailment Cost / Hour</div>
+                    <div class="text-2xl font-bold text-white" id="val1">£60,000</div>
+                    <div class="text-xs text-gray-500 mt-1">@ £150 per MWh</div>
+                </div>
+
+                <!-- Card 2 -->
+                <div class="bg-gray-800 p-4 rounded-lg border-l-4 border-gray-500" id="card2">
+                    <div class="text-sm text-gray-400 mb-1" id="label2">Annual Constraint Projection</div>
+                    <div class="text-2xl font-bold text-white" id="val2">£525.6M</div>
+                    <div class="text-xs text-gray-500 mt-1">Added to consumer bills</div>
+                </div>
+
+                <!-- Card 3 -->
+                <div class="bg-gray-800 p-4 rounded-lg border-l-4 border-gray-500" id="card3">
+                    <div class="text-sm text-gray-400 mb-1" id="label3">NHS Compute Value (Lost)</div>
+                    <div class="text-2xl font-bold text-white" id="val3">£0</div>
+                    <div class="text-xs text-gray-500 mt-1">@ £0.50 per GPU hr eq.</div>
+                </div>
+
+                <!-- Card 4 -->
+                <div class="bg-gray-800 p-4 rounded-lg border-l-4 border-gray-500" id="card4">
+                    <div class="text-sm text-gray-400 mb-1" id="label4">Bill Payer Impact</div>
+                    <div class="text-2xl font-bold text-white" id="val4">+ £18.77</div>
+                    <div class="text-xs text-gray-500 mt-1">Cost per household/yr</div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Footer -->
+    <footer class="w-full max-w-5xl mt-8 text-center text-xs text-gray-500 py-4 border-t border-gray-800">
+        Architecture protected under UK IPO Application GB2610235.0
+    </footer>
+
+    <script>
+        // DOM Elements
+        const genSlider = document.getElementById('genSlider');
+        const capSlider = document.getElementById('capSlider');
+        const genValue = document.getElementById('genValue');
+        const capValue = document.getElementById('capValue');
+        const statusText = document.getElementById('statusText');
+        
+        // SVG Elements
+        const cablePath = document.getElementById('cablePath');
+        const bufferPath = document.getElementById('bufferPath');
+        const gridImportText = document.getElementById('gridImportText');
+        const containerBox = document.getElementById('containerBox');
+        const containerTitle = document.getElementById('containerTitle');
+        const containerMetrics1 = document.getElementById('containerMetrics1');
+        const containerMetrics2 = document.getElementById('containerMetrics2');
+        const warningBox = document.getElementById('warningBox');
+        const warningText = document.getElementById('warningText');
+
+        // Dashboard Elements
+        const val1 = document.getElementById('val1');
+        const val2 = document.getElementById('val2');
+        const val3 = document.getElementById('val3');
+        const val4 = document.getElementById('val4');
+        const label3 = document.getElementById('label3');
+        const label4 = document.getElementById('label4');
+        const card1 = document.getElementById('card1');
+        const card2 = document.getElementById('card2');
+        const card3 = document.getElementById('card3');
+        const card4 = document.getElementById('card4');
+
+        // Toggle Elements
+        const toggleOff = document.getElementById('toggleOff');
+        const toggleOn = document.getElementById('toggleOn');
+
+        // State
+        let bufferActive = false;
+        const HOUSEHOLDS_UK = 28000000; // Est UK households for math
+
+        // Formatter
+        const formatCurrency = (num) => {
+            if(num >= 1000000) return '£' + (num / 1000000).toFixed(1) + 'M';
+            return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', maximumFractionDigits: 0 }).format(num);
+        };
+
+        function toggleBuffer() {
+            bufferActive = !bufferActive;
+            if(bufferActive) {
+                toggleOff.className = "px-4 py-1 rounded-full text-sm font-bold text-gray-400 transition-all";
+                toggleOn.className = "px-4 py-1 rounded-full text-sm font-bold bg-accent text-navy transition-all shadow-[0_0_10px_#00C896]";
+            } else {
+                toggleOff.className = "px-4 py-1 rounded-full text-sm font-bold bg-danger text-white transition-all shadow-[0_0_10px_#EF4444]";
+                toggleOn.className = "px-4 py-1 rounded-full text-sm font-bold text-gray-400 transition-all";
+            }
+            updateSim();
+        }
+
+        function updateSim() {
+            const gen = parseInt(genSlider.value);
+            const cap = parseInt(capSlider.value);
+            
+            genValue.innerText = `${gen} MW`;
+            capValue.innerText = `${cap} MW`;
+
+            const curtailment = Math.max(0, gen - cap);
+            const exportToGrid = Math.min(gen, cap);
+
+            gridImportText.innerText = `${exportToGrid} MW`;
+
+            // Math calculations
+            const costPerHour = curtailment * 150;
+            const annualWaste = costPerHour * 24 * 365;
+            
+            // 1MW = 1000kW ~ 1000 GPUs eq.
+            const gpuHoursPerHr = curtailment * 1000;
+            const nhsValuePerHour = gpuHoursPerHr * 0.50;
+            const annualNhsValue = nhsValuePerHour * 24 * 365;
+            const jobsPerHour = gpuHoursPerHr * 60; // Est 60 inference jobs per GPU hr
+            
+            const householdImpact = annualWaste / HOUSEHOLDS_UK;
+
+            if (curtailment === 0) {
+                // NO CURTAILMENT
+                statusText.innerText = `Grid Balanced - No Curtailment`;
+                statusText.className = "text-lg font-bold mt-1 text-gridblue";
+                
+                cablePath.style.stroke = "#3B82F6"; // gridblue
+                bufferPath.style.opacity = "0.1";
+                
+                warningBox.setAttribute("fill", "#1F2937");
+                warningText.setAttribute("fill", "#9CA3AF");
+                warningText.textContent = "SYSTEM NORMAL";
+
+                containerBox.setAttribute("stroke", "#374151");
+                containerBox.classList.remove("pulse");
+                containerTitle.textContent = "BUFFER IDLE";
+                containerTitle.setAttribute("fill", "#9CA3AF");
+                containerMetrics1.textContent = "";
+                containerMetrics2.textContent = "";
+                
+                updateCards(0, 0, 0, 0, false);
+                
+            } else {
+                // CURTAILMENT ACTIVE
+                if (!bufferActive) {
+                    // Wasting Energy
+                    statusText.innerText = `${curtailment} MW Curtailed (Wasted)`;
+                    statusText.className = "text-lg font-bold mt-1 text-danger";
+                    
+                    cablePath.style.stroke = "#EF4444"; // danger
+                    bufferPath.style.opacity = "1";
+                    bufferPath.style.stroke = "#EF4444";
+                    
+                    warningBox.setAttribute("fill", "#EF4444");
+                    warningText.setAttribute("fill", "white");
+                    warningText.textContent = "CURTAILMENT ACTIVE";
+
+                    containerBox.setAttribute("stroke", "#EF4444");
+                    containerBox.classList.remove("pulse");
+                    containerTitle.textContent = "WASTED ENERGY";
+                    containerTitle.setAttribute("fill", "white");
+                    containerMetrics1.textContent = `${curtailment} MW Grounded`;
+                    containerMetrics1.setAttribute("fill", "#EF4444");
+                    containerMetrics2.textContent = "£" + (curtailment*150).toLocaleString() + "/hr constraint pay";
+                    containerMetrics2.setAttribute("fill", "#EF4444");
+
+                    updateCards(costPerHour, annualWaste, 0, householdImpact, false);
+
+                } else {
+                    // Smart Buffer Active
+                    statusText.innerText = `${curtailment} MW Absorbed by NHS Buffer`;
+                    statusText.className = "text-lg font-bold mt-1 text-accent";
+                    
+                    cablePath.style.stroke = "#3B82F6"; 
+                    bufferPath.style.opacity = "1";
+                    bufferPath.style.stroke = "#00C896"; // accent
+                    
+                    warningBox.setAttribute("fill", "#00C896");
+                    warningText.setAttribute("fill", "#0D1B2A");
+                    warningText.textContent = "BUFFER ENGAGED";
+
+                    containerBox.setAttribute("stroke", "#00C896");
+                    containerBox.classList.add("pulse");
+                    containerTitle.textContent = "NHS AI INFERENCE RUNNING";
+                    containerTitle.setAttribute("fill", "#00C896");
+                    containerMetrics1.textContent = `${jobsPerHour.toLocaleString()} imaging jobs / hr`;
+                    containerMetrics1.setAttribute("fill", "white");
+                    containerMetrics2.textContent = `Generating 65°C District Heat`;
+                    containerMetrics2.setAttribute("fill", "#9CA3AF");
+
+                    updateCards(costPerHour, annualWaste, annualNhsValue, householdImpact, true);
+                }
+            }
+        }
+
+        function updateCards(cost, annual, nhs, household, isBufferOn) {
+            val1.textContent = formatCurrency(cost);
+            val2.textContent = formatCurrency(annual);
+
+            if(isBufferOn) {
+                // Green Mode
+                label3.textContent = "Annual NHS Compute Value";
+                val3.textContent = formatCurrency(nhs);
+                val3.className = "text-2xl font-bold text-accent";
+                
+                label4.textContent = "Bill Payer Savings";
+                val4.textContent = "- " + formatCurrency(household);
+                val4.className = "text-2xl font-bold text-accent";
+
+                [card1, card2, card3, card4].forEach(c => c.className = "bg-gray-800 p-4 rounded-lg border-l-4 border-accent transition-colors");
+            } else {
+                // Red Mode
+                label3.textContent = "NHS Compute Value (Lost)";
+                val3.textContent = "£0";
+                val3.className = "text-2xl font-bold text-gray-500";
+                
+                label4.textContent = "Bill Payer Impact";
+                val4.textContent = "+ " + (household > 0 ? formatCurrency(household) : '£0.00');
+                val4.className = "text-2xl font-bold text-danger";
+
+                [card1, card2].forEach(c => c.className = "bg-gray-800 p-4 rounded-lg border-l-4 border-danger transition-colors");
+                card3.className = "bg-gray-800 p-4 rounded-lg border-l-4 border-gray-600 transition-colors";
+                card4.className = "bg-gray-800 p-4 rounded-lg border-l-4 border-danger transition-colors";
+                
+                if(cost === 0) {
+                    [card1, card2, card3, card4].forEach(c => c.className = "bg-gray-800 p-4 rounded-lg border-l-4 border-gray-600 transition-colors");
+                    val4.className = "text-2xl font-bold text-gray-500";
+                }
+            }
+        }
+
+        // Event Listeners
+        genSlider.addEventListener('input', updateSim);
+        capSlider.addEventListener('input', updateSim);
+
+        // Init
+        updateSim();
+    </script>
+</body>
+</html>
