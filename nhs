@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smart Buffer Array — Live Grid Simulator</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --navy: #040d18;
+  --panel: #071525;
+  --border: #0e2a42;
+  --green: #00e5a0;
+  --red: #ff3d5a;
+  --amber: #ffb300;
+  --blue: #1e90ff;
+  --white: #f0f8ff;
+  --grey: #4a6580;
+  --mono: 'Share Tech Mono', monospace;
+  --sans: 'Barlow', sans-serif;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  background: var(--navy);
+  color: var(--white);
+  font-family: var(--sans);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Grid background */
+body::before {
+  content:'';
+  position:fixed;
+  inset:0;
+  background-image:
+    linear-gradient(rgba(0,229,160,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,229,160,0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events:none;
+  z-index:0;
+}
+
+/* ── HEADER ── */
+header {
+  position:relative;
+  z-index:10;
+  padding: 28px 40px 20px;
+  border-bottom: 1px solid var(--border);
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-end;
+  flex-wrap:wrap;
+  gap:16px;
+}
+
+.logo-area h1 {
+  font-size: clamp(18px,2.5vw,26px);
+  font-weight:900;
+  letter-spacing:-0.5px;
+  color:var(--white);
+}
+
+.logo-area h1 span { color:var(--green); }
+
+.logo-area p {
+  font-size:11px;
+  color:var(--grey);
+  font-family:var(--mono);
+  margin-top:4px;
+  letter-spacing:0.05em;
+}
+
+.live-badge {
+  display:flex;
+  align-items:center;
+  gap:8px;
+  background:rgba(255,61,90,0.1);
+  border:1px solid rgba(255,61,90,0.3);
+  border-radius:4px;
+  padding:6px 14px;
+  font-family:var(--mono);
+  font-size:11px;
+  color:var(--red);
+  letter-spacing:0.1em;
+}
+
+.live-dot {
+  width:8px; height:8px;
+  border-radius:50%;
+  background:var(--red);
+  animation: blink 1s infinite;
+}
+
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+/* ── STORY TABS ── */
+.story-nav {
+  position:relative;
+  z-index:10;
+  display:flex;
+  gap:0;
+  border-bottom:1px solid var(--border);
+  padding: 0 40px;
+  overflow-x:auto;
+}
+
+.story-tab {
+  padding: 14px 28px;
+  font-size:12px;
+  font-weight:700;
+  letter-spacing:0.08em;
+  text-transform:uppercase;
+  color:var(--grey);
+  cursor:pointer;
+  border-bottom:2px solid transparent;
+  transition: all 0.2s;
+  white-space:nowrap;
+  background:none;
+  border-top:none;
+  border-left:none;
+  border-right:none;
+  font-family:var(--sans);
+}
+
+.story-tab:hover { color:var(--white); }
+.story-tab.active { color:var(--green); border-bottom-color:var(--green); }
+
+/* ── MAIN ── */
+main {
+  position:relative;
+  z-index:10;
+  padding: 32px 40px;
+  max-width:1200px;
+  margin:0 auto;
+}
+
+/* ── SCENE ── */
+.scene { display:none; }
+.scene.active { display:block; animation: fadeIn 0.4s ease; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
+
+/* ── SCENE HEADINGS ── */
+.scene-header { margin-bottom:28px; }
+.scene-header .act { font-family:var(--mono); font-size:10px; color:var(--green); letter-spacing:0.2em; margin-bottom:8px; }
+.scene-header h2 { font-size:clamp(22px,3vw,32px); font-weight:900; line-height:1.1; }
+.scene-header h2 em { color:var(--red); font-style:normal; }
+.scene-header h2 .g { color:var(--green); }
+.scene-header p { color:var(--grey); font-size:14px; margin-top:10px; max-width:600px; line-height:1.6; }
+
+/* ── GRID LAYOUT ── */
+.grid2 { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+.grid3 { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+@media(max-width:768px) { .grid2,.grid3 { grid-template-columns:1fr; } }
+
+/* ── PANELS ── */
+.panel {
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:8px;
+  padding:24px;
+}
+
+.panel-label {
+  font-family:var(--mono);
+  font-size:9px;
+  letter-spacing:0.2em;
+  color:var(--grey);
+  text-transform:uppercase;
+  margin-bottom:16px;
+  padding-bottom:10px;
+  border-bottom:1px solid var(--border);
+}
+
+/* ── STAT BLOCKS ── */
+.stat { margin-bottom:20px; }
+.stat-label { font-size:11px; color:var(--grey); margin-bottom:4px; letter-spacing:0.05em; }
+.stat-value { font-family:var(--mono); font-size:28px; font-weight:700; }
+.stat-value.red { color:var(--red); }
+.stat-value.green { color:var(--green); }
+.stat-value.amber { color:var(--amber); }
+.stat-value.blue { color:var(--blue); }
+.stat-sub { font-size:11px; color:var(--grey); margin-top:3px; }
+
+/* ── SLIDERS ── */
+.slider-wrap { margin-bottom:20px; }
+.slider-top { display:flex; justify-content:space-between; margin-bottom:8px; }
+.slider-name { font-size:12px; color:var(--grey); }
+.slider-val { font-family:var(--mono); font-size:13px; font-weight:700; color:var(--green); }
+
+input[type=range] {
+  -webkit-appearance:none;
+  width:100%; height:4px;
+  background:var(--border);
+  border-radius:2px;
+  outline:none;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance:none;
+  width:20px; height:20px;
+  border-radius:50%;
+  background:var(--green);
+  cursor:pointer;
+  box-shadow:0 0 10px rgba(0,229,160,0.5);
+}
+
+/* ── FLOW SVG SCENE ── */
+.flow-container {
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:8px;
+  padding:20px;
+  margin-bottom:20px;
+}
+
+/* ── ANIMATED FLOW ── */
+.flow-line {
+  stroke-dasharray:16 10;
+  animation: dash 0.8s linear infinite;
+}
+.flow-line.slow { animation-duration:2s; }
+.flow-line.stopped { animation:none; stroke-dasharray:none; opacity:0.2; }
+
+@keyframes dash { to { stroke-dashoffset:-26; } }
+
+/* ── METRIC CARDS ── */
+.metric-row { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-top:20px; }
+@media(max-width:900px) { .metric-row { grid-template-columns:repeat(2,1fr); } }
+
+.metric-card {
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:6px;
+  padding:16px;
+  border-left:3px solid var(--border);
+  transition: border-color 0.3s;
+}
+.metric-card.red { border-left-color:var(--red); }
+.metric-card.green { border-left-color:var(--green); }
+.metric-card.amber { border-left-color:var(--amber); }
+.metric-card.blue { border-left-color:var(--blue); }
+
+.metric-card .mc-label { font-size:10px; color:var(--grey); letter-spacing:0.05em; margin-bottom:6px; }
+.metric-card .mc-val { font-family:var(--mono); font-size:20px; font-weight:700; }
+.metric-card .mc-sub { font-size:10px; color:var(--grey); margin-top:4px; }
+
+/* ── TOGGLE ── */
+.toggle-wrap {
+  display:flex;
+  gap:0;
+  background:rgba(255,255,255,0.03);
+  border:1px solid var(--border);
+  border-radius:6px;
+  overflow:hidden;
+  width:fit-content;
+  margin-bottom:24px;
+}
+
+.toggle-btn {
+  padding:10px 24px;
+  font-size:12px;
+  font-weight:700;
+  letter-spacing:0.08em;
+  text-transform:uppercase;
+  cursor:pointer;
+  transition:all 0.2s;
+  background:none;
+  border:none;
+  color:var(--grey);
+  font-family:var(--sans);
+}
+.toggle-btn.active-red { background:rgba(255,61,90,0.15); color:var(--red); }
+.toggle-btn.active-green { background:rgba(0,229,160,0.15); color:var(--green); }
+
+/* ── RESPONSE DEMO ── */
+.response-bar {
+  height:48px;
+  background:var(--border);
+  border-radius:4px;
+  overflow:hidden;
+  position:relative;
+  margin:12px 0;
+}
+.response-fill {
+  height:100%;
+  border-radius:4px;
+  transition: width 0.05s linear;
+  display:flex;
+  align-items:center;
+  padding:0 12px;
+  font-family:var(--mono);
+  font-size:12px;
+  font-weight:700;
+  white-space:nowrap;
+}
+
+/* ── TIMELINE ── */
+.timeline {
+  display:flex;
+  gap:0;
+  margin:20px 0;
+  border:1px solid var(--border);
+  border-radius:6px;
+  overflow:hidden;
+}
+.tl-step {
+  flex:1;
+  padding:14px 12px;
+  border-right:1px solid var(--border);
+  font-size:11px;
+}
+.tl-step:last-child { border-right:none; }
+.tl-step .tl-time { font-family:var(--mono); font-size:16px; font-weight:700; margin-bottom:4px; }
+.tl-step .tl-label { color:var(--grey); font-size:10px; }
+.tl-step.active-step { background:rgba(0,229,160,0.05); }
+.tl-step.active-step .tl-time { color:var(--green); }
+
+/* ── IMPACT BARS ── */
+.impact-row { margin-bottom:14px; }
+.impact-top { display:flex; justify-content:space-between; margin-bottom:5px; font-size:12px; }
+.impact-bar-bg { height:8px; background:var(--border); border-radius:4px; overflow:hidden; }
+.impact-bar-fill { height:100%; border-radius:4px; transition:width 0.6s ease; }
+
+/* ── FOOTER ── */
+footer {
+  position:relative; z-index:10;
+  text-align:center;
+  padding:20px 40px;
+  border-top:1px solid var(--border);
+  font-family:var(--mono);
+  font-size:10px;
+  color:var(--grey);
+  letter-spacing:0.05em;
+}
+
+footer a { color:var(--green); text-decoration:none; }
+
+/* ── ALERT BOX ── */
+.alert {
+  padding:12px 16px;
+  border-radius:6px;
+  font-size:12px;
+  margin-bottom:16px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  font-family:var(--mono);
+}
+.alert.red { background:rgba(255,61,90,0.08); border:1px solid rgba(255,61,90,0.2); color:var(--red); }
+.alert.green { background:rgba(0,229,160,0.08); border:1px solid rgba(0,229,160,0.2); color:var(--green); }
+.alert.amber { background:rgba(255,179,0,0.08); border:1px solid rgba(255,179,0,0.2); color:var(--amber); }
+
+/* ── PULSE GLOW ── */
+.glow-green { filter:drop-shadow(0 0 8px rgba(0,229,160,0.6)); }
+.glow-red { filter:drop-shadow(0 0 8px rgba(255,61,90,0.6)); }
+
+/* ── COUNTER ── */
+.live-counter {
+  font-family:var(--mono);
+  font-size:48px;
+  font-weight:700;
+  color:var(--red);
+  line-height:1;
+}
+
+.counter-label { font-size:12px; color:var(--grey); margin-top:6px; }
+
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-area">
+    <h1>Smart Buffer Array <span>// Tealing Pilot</span></h1>
+    <p>TEALING GRID TECH &nbsp;|&nbsp; KAYODE ADEDIJI, DUNDEE &nbsp;|&nbsp; UK IPO: GB2610235.0</p>
+  </div>
+  <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+    <div class="live-badge"><div class="live-dot"></div> LIVE GRID DATA SIMULATION</div>
+  </div>
+</header>
+
+<nav class="story-nav">
+  <button class="story-tab active" onclick="showScene(0)">① The Problem</button>
+  <button class="story-tab" onclick="showScene(1)">② The Waste — Live</button>
+  <button class="story-tab" onclick="showScene(2)">③ Smart Buffer Activates</button>
+  <button class="story-tab" onclick="showScene(3)">④ The 200ms Response</button>
+  <button class="story-tab" onclick="showScene(4)">⑤ Energy Captured</button>
+  <button class="story-tab" onclick="showScene(5)">⑥ NHS & Government Impact</button>
+</nav>
+
+<main>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- SCENE 0: THE PROBLEM -->
+<!-- ══════════════════════════════════════════ -->
+<div class="scene active" id="scene0">
+  <div class="scene-header">
+    <div class="act">ACT 01 — THE PROBLEM</div>
+    <h2>Scotland generates <em>more wind</em> than the cable can carry.<br>The Smart Buffer <span class="g">absorbs the surplus.</span></h2>
+    <p>When offshore wind generation exceeds export capacity, curtailment occurs — clean energy goes unused and constraint payments are recovered from consumer bills. The Smart Buffer Array is a controllable demand asset designed to absorb that surplus and convert it into productive output.</p>
+  </div>
+
+  <div class="grid2">
+    <div class="panel">
+      <div class="panel-label">The Tealing Constraint — Right Now</div>
+      <div class="stat">
+        <div class="stat-label">Annual UK Curtailment Cost</div>
+        <div class="stat-value red" id="s0-annual">£1.46B</div>
+        <div class="stat-sub">paid to wind farms to do nothing</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Cost Per UK Household Per Year</div>
+        <div class="stat-value amber">£52.14</div>
+        <div class="stat-sub">added to every energy bill</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Scottish Wind Curtailed in 2024</div>
+        <div class="stat-value red">6.1 TWh</div>
+        <div class="stat-sub">enough to power 1.8 million homes</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-label">Smart Buffer Array — At a Glance</div>
+      <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:16px;">
+        <div style="background:rgba(0,229,160,0.05);border:1px solid rgba(0,229,160,0.1);border-radius:6px;padding:14px;">
+          <div style="font-size:10px;color:var(--grey);margin-bottom:8px;letter-spacing:0.05em;">DEPLOYMENT</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <div><div style="font-size:10px;color:var(--grey)">Format</div><div style="font-family:var(--mono);font-size:13px;color:var(--white)">20ft High Cube ISO</div></div>
+            <div><div style="font-size:10px;color:var(--grey)">Footprint</div><div style="font-family:var(--mono);font-size:13px;color:var(--white)">~160 sq ft</div></div>
+            <div><div style="font-size:10px;color:var(--grey)">Timeline</div><div style="font-family:var(--mono);font-size:13px;color:var(--white)">12–18 months</div></div>
+            <div><div style="font-size:10px;color:var(--grey)">Capacity</div><div style="font-family:var(--mono);font-size:13px;color:var(--white)">1MW – 1.5MW</div></div>
+          </div>
+        </div>
+        <div style="background:rgba(30,144,255,0.05);border:1px solid rgba(30,144,255,0.1);border-radius:6px;padding:14px;">
+          <div style="font-size:10px;color:var(--grey);margin-bottom:8px;letter-spacing:0.05em;">NETWORK BENEFIT</div>
+          <div style="font-size:12px;color:var(--blue);line-height:1.7;">Controllable interruptible demand asset<br>Sub-200ms grid response<br>NIA fundable — Phase 1 feasibility only<br>Replicable at any constraint point</div>
+        </div>
+      </div>
+      <div class="alert amber">⚠ Tealing Substation referred by NESO as a Non-Wire Alternative candidate — Smart Buffer Array is designed specifically for this use case.</div>
+    </div>
+  </div>
+
+  <div style="margin-top:16px;text-align:center;">
+    <button onclick="showScene(1)" style="background:rgba(0,229,160,0.1);border:1px solid var(--green);color:var(--green);padding:12px 32px;border-radius:6px;font-family:var(--sans);font-size:13px;font-weight:700;cursor:pointer;letter-spacing:0.05em;">SEE THE LIVE WASTE → </button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- SCENE 1: LIVE WASTE COUNTER -->
+<!-- ══════════════════════════════════════════ -->
+<div class="scene" id="scene1">
+  <div class="scene-header">
+    <div class="act">ACT 02 — THE WASTE, LIVE</div>
+    <h2>Watch the money <em>disappear</em> in real time.</h2>
+    <p>Drag the slider to set the current curtailment level. The counter below shows exactly what is being wasted — every second you watch.</p>
+  </div>
+
+  <div class="grid2">
+    <div class="panel">
+      <div class="panel-label">Grid Controls</div>
+      <div class="slider-wrap">
+        <div class="slider-top">
+          <span class="slider-name">Wind Generation (MW)</span>
+          <span class="slider-val" id="s1-gen">800 MW</span>
+        </div>
+        <input type="range" id="s1-genSlider" min="0" max="1500" value="800" oninput="updateScene1()">
+      </div>
+      <div class="slider-wrap">
+        <div class="slider-top">
+          <span class="slider-name">Cable Export Limit (MW)</span>
+          <span class="slider-val" id="s1-cap" style="color:var(--blue)">400 MW</span>
+        </div>
+        <input type="range" id="s1-capSlider" min="100" max="1000" value="400" oninput="updateScene1()">
+      </div>
+
+      <div style="margin-top:20px;padding:16px;background:rgba(255,61,90,0.05);border:1px solid rgba(255,61,90,0.15);border-radius:6px;">
+        <div style="font-size:11px;color:var(--grey);margin-bottom:4px;">Curtailed Right Now</div>
+        <div style="font-family:var(--mono);font-size:32px;font-weight:700;color:var(--red)" id="s1-curtailed">400 MW</div>
+        <div style="font-size:11px;color:var(--grey);margin-top:4px;">being paid to sit idle</div>
+      </div>
+    </div>
+
+    <div class="panel" style="display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;">
+      <div style="font-size:11px;color:var(--grey);letter-spacing:0.1em;margin-bottom:12px;font-family:var(--mono);">CONSTRAINT PAYMENT BURNING</div>
+      <div class="live-counter" id="s1-liveCounter">£0.00</div>
+      <div class="counter-label">since you opened this tab</div>
+      <div style="margin-top:24px;padding:12px 20px;background:rgba(255,61,90,0.05);border:1px solid rgba(255,61,90,0.15);border-radius:6px;width:100%;">
+        <div style="font-size:11px;color:var(--grey);margin-bottom:4px;">Hourly Rate</div>
+        <div style="font-family:var(--mono);font-size:20px;color:var(--red)" id="s1-hourly">£60,000/hr</div>
+      </div>
+      <div style="margin-top:12px;padding:12px 20px;background:rgba(255,179,0,0.05);border:1px solid rgba(255,179,0,0.15);border-radius:6px;width:100%;">
+        <div style="font-size:11px;color:var(--grey);margin-bottom:4px;">Annual Projection at This Rate</div>
+        <div style="font-family:var(--mono);font-size:20px;color:var(--amber)" id="s1-annual">£525.6M</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top:16px;text-align:center;">
+    <button onclick="showScene(2)" style="background:rgba(0,229,160,0.1);border:1px solid var(--green);color:var(--green);padding:12px 32px;border-radius:6px;font-family:var(--sans);font-size:13px;font-weight:700;cursor:pointer;letter-spacing:0.05em;">ACTIVATE THE SMART BUFFER →</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- SCENE 2: BUFFER ACTIVATES — FLOW DIAGRAM -->
+<!-- ══════════════════════════════════════════ -->
+<div class="scene" id="scene2">
+  <div class="scene-header">
+    <div class="act">ACT 03 — THE SOLUTION</div>
+    <h2>One container. <span class="g">One signal.</span> The waste stops.</h2>
+    <p>The Smart Buffer Array sits adjacent to Tealing Substation. When curtailment is detected, it becomes the grid's pressure release valve — instantly absorbing surplus energy and converting it into productive compute output.</p>
+  </div>
+
+  <div class="flow-container">
+    <div style="display:flex;justify-content:space-between;margin-bottom:12px;align-items:center;">
+      <div style="font-family:var(--mono);font-size:10px;color:var(--grey);letter-spacing:0.15em;">LIVE ENERGY FLOW — TEALING SUBSTATION</div>
+      <div class="toggle-wrap">
+        <button class="toggle-btn active-red" id="flowBtn0" onclick="setFlowMode(0)">WITHOUT BUFFER</button>
+        <button class="toggle-btn" id="flowBtn1" onclick="setFlowMode(1)">WITH BUFFER</button>
+      </div>
+    </div>
+
+    <svg width="100%" viewBox="0 0 800 280" preserveAspectRatio="xMidYMid meet">
+
+      <!-- WIND FARM -->
+      <rect x="10" y="90" width="120" height="100" rx="6" fill="#071525" stroke="#0e2a42" stroke-width="1.5"/>
+      <text x="70" y="120" fill="#f0f8ff" font-size="11" text-anchor="middle" font-family="Barlow" font-weight="700">OFFSHORE</text>
+      <text x="70" y="135" fill="#f0f8ff" font-size="11" text-anchor="middle" font-family="Barlow" font-weight="700">WIND FARM</text>
+      <text id="windMW" x="70" y="158" fill="#1e90ff" font-size="13" text-anchor="middle" font-family="Share Tech Mono" font-weight="700">800 MW</text>
+      <text x="70" y="173" fill="#4a6580" font-size="9" text-anchor="middle" font-family="Share Tech Mono">GENERATING</text>
+
+      <!-- MAIN CABLE — WIND TO SUBSTATION -->
+      <line x1="130" y1="140" x2="310" y2="140" stroke="#0e2a42" stroke-width="8" stroke-linecap="round"/>
+      <line id="flowCable1" x1="130" y1="140" x2="310" y2="140" stroke="#1e90ff" stroke-width="4" stroke-linecap="round" class="flow-line"/>
+      <text x="220" y="128" fill="#4a6580" font-size="9" text-anchor="middle" font-family="Share Tech Mono">TRANSMISSION</text>
+
+      <!-- SUBSTATION BOX -->
+      <rect x="310" y="100" width="100" height="80" rx="4" fill="#071525" stroke="#0e2a42" stroke-width="1.5"/>
+      <text x="360" y="133" fill="#f0f8ff" font-size="10" text-anchor="middle" font-family="Barlow" font-weight="700">TEALING</text>
+      <text x="360" y="148" fill="#f0f8ff" font-size="10" text-anchor="middle" font-family="Barlow" font-weight="700">SUBSTATION</text>
+      <text x="360" y="165" fill="#ffb300" font-size="9" text-anchor="middle" font-family="Share Tech Mono">CONSTRAINT</text>
+
+      <!-- CABLE — SUBSTATION TO UK GRID -->
+      <line x1="410" y1="140" x2="580" y2="140" stroke="#0e2a42" stroke-width="8" stroke-linecap="round"/>
+      <line id="flowCable2" x1="410" y1="140" x2="580" y2="140" stroke="#1e90ff" stroke-width="4" stroke-linecap="round" class="flow-line"/>
+      <text x="495" y="128" fill="#4a6580" font-size="9" text-anchor="middle" font-family="Share Tech Mono">400MW LIMIT</text>
+
+      <!-- UK GRID -->
+      <rect x="580" y="90" width="110" height="100" rx="6" fill="#071525" stroke="#0e2a42" stroke-width="1.5"/>
+      <text x="635" y="128" fill="#f0f8ff" font-size="11" text-anchor="middle" font-family="Barlow" font-weight="700">UK GRID</text>
+      <text id="gridMW" x="635" y="148" fill="#1e90ff" font-size="13" text-anchor="middle" font-family="Share Tech Mono">400 MW</text>
+      <text x="635" y="163" fill="#4a6580" font-size="9" text-anchor="middle" font-family="Share Tech Mono">EXPORTED</text>
+      <text x="635" y="178" fill="#4a6580" font-size="9" text-anchor="middle" font-family="Share Tech Mono">SOUTH</text>
+
+      <!-- CURTAILMENT DROP LINE -->
+      <line x1="360" y1="180" x2="360" y2="220" stroke="#0e2a42" stroke-width="6" stroke-linecap="round"/>
+      <line id="dropLine" x1="360" y1="180" x2="360" y2="220" stroke="#ff3d5a" stroke-width="3" stroke-linecap="round" class="flow-line"/>
+
+      <!-- WASTED / BUFFER BOX -->
+      <rect id="bufferRect" x="270" y="220" width="180" height="55" rx="4" fill="#071525" stroke="#ff3d5a" stroke-width="1.5"/>
+      <text id="bufferTitle" x="360" y="242" fill="#ff3d5a" font-size="11" text-anchor="middle" font-family="Barlow" font-weight="700">⚠ WASTED ENERGY</text>
+      <text id="bufferSub1" x="360" y="257" fill="#ff3d5a" font-size="10" text-anchor="middle" font-family="Share Tech Mono">400 MW GROUNDED</text>
+      <text id="bufferSub2" x="360" y="270" fill="#4a6580" font-size="9" text-anchor="middle" font-family="Share Tech Mono">£60,000/hr constraint payment</text>
+
+      <!-- WARNING LABEL on cable -->
+      <rect id="warningRect" x="270" y="50" width="180" height="28" rx="4" fill="#ff3d5a"/>
+      <text id="warningTxt" x="360" y="68" fill="white" font-size="10" text-anchor="middle" font-family="Share Tech Mono" font-weight="700">CURTAILMENT ACTIVE</text>
+
+    </svg>
+  </div>
+
+  <div style="margin-top:16px;text-align:center;">
+    <button onclick="showScene(3)" style="background:rgba(0,229,160,0.1);border:1px solid var(--green);color:var(--green);padding:12px 32px;border-radius:6px;font-family:var(--sans);font-size:13px;font-weight:700;cursor:pointer;letter-spacing:0.05em;">SEE THE 200ms RESPONSE →</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- SCENE 3: 200ms RESPONSE -->
+<!-- ══════════════════════════════════════════ -->
+<div class="scene" id="scene3">
+  <div class="scene-header">
+    <div class="act">ACT 04 — THE 200ms RESPONSE</div>
+    <h2>Faster than a protection relay.<br><span class="g">Zero voltage shock to the network.</span></h2>
+    <p>The Siemens S7-1200 PLC receives the curtailment signal and transfers the full 1MW load to the DC intermediate buffer layer. This allows a controlled, zero-impact soft ramp-down of the AC grid connection — preventing the transient voltage spike that a standard hard disconnect would cause.</p>
+  </div>
+
+  <div class="grid2">
+    <div class="panel">
+      <div class="panel-label">Response Sequence — Click to Simulate</div>
+
+      <div class="timeline" id="timeline">
+        <div class="tl-step" id="tl0">
+          <div class="tl-time" style="color:var(--grey)">T+0ms</div>
+          <div class="tl-label">Curtailment signal received</div>
+        </div>
+        <div class="tl-step" id="tl1">
+          <div class="tl-time" style="color:var(--grey)">T+12ms</div>
+          <div class="tl-label">S7-1200 PLC processes signal</div>
+        </div>
+        <div class="tl-step" id="tl2">
+          <div class="tl-time" style="color:var(--grey)">T+85ms</div>
+          <div class="tl-label">DC buffer layer isolates load</div>
+        </div>
+        <div class="tl-step" id="tl3">
+          <div class="tl-time" style="color:var(--grey)">&lt;200ms</div>
+          <div class="tl-label">Full load transfer complete</div>
+        </div>
+      </div>
+
+      <button onclick="runResponseDemo()" style="width:100%;padding:12px;background:rgba(0,229,160,0.08);border:1px solid rgba(0,229,160,0.3);color:var(--green);font-family:var(--sans);font-size:13px;font-weight:700;border-radius:6px;cursor:pointer;letter-spacing:0.05em;margin-bottom:16px;">▶ TRIGGER CURTAILMENT SIGNAL</button>
+
+      <div style="margin-bottom:8px;font-size:11px;color:var(--grey);">Load Transfer Progress</div>
+      <div class="response-bar">
+        <div class="response-fill" id="responseBar" style="width:0%;background:linear-gradient(90deg,#1e90ff,#00e5a0);">
+          <span id="responseLabel"></span>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:9px;color:var(--grey);margin-top:4px;">
+        <span>0ms</span><span>100ms</span><span>200ms ✓</span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-label">Why This Matters to the Network</div>
+
+      <div class="alert red" style="margin-bottom:16px;">⚡ Standard hard disconnect causes a voltage transient spike that can trigger protection relays across the substation.</div>
+      <div class="alert green">✓ Smart Buffer DC isolation allows controlled AC ramp-down — zero transient. Zero network disturbance.</div>
+
+      <div style="margin-top:20px;">
+        <div class="impact-row" style="margin-bottom:12px;">
+          <div class="impact-top"><span>Standard disconnect — voltage spike risk</span><span style="color:var(--red)">HIGH</span></div>
+          <div class="impact-bar-bg"><div class="impact-bar-fill" style="width:85%;background:var(--red)"></div></div>
+        </div>
+        <div class="impact-row" style="margin-bottom:12px;">
+          <div class="impact-top"><span>Smart Buffer — voltage spike risk</span><span style="color:var(--green)">ZERO</span></div>
+          <div class="impact-bar-bg"><div class="impact-bar-fill" style="width:2%;background:var(--green)"></div></div>
+        </div>
+        <div class="impact-row" style="margin-bottom:12px;">
+          <div class="impact-top"><span>Lancium (Texas) response time</span><span style="color:var(--red)">5 mins</span></div>
+          <div class="impact-bar-bg"><div class="impact-bar-fill" style="width:100%;background:var(--red)"></div></div>
+        </div>
+        <div class="impact-row">
+          <div class="impact-top"><span>Smart Buffer response time</span><span style="color:var(--green)">&lt;200ms</span></div>
+          <div class="impact-bar-bg"><div class="impact-bar-fill" style="width:1%;background:var(--green)"></div></div>
+        </div>
+      </div>
+
+      <div style="margin-top:16px;padding:12px;background:rgba(0,229,160,0.05);border:1px solid rgba(0,229,160,0.1);border-radius:6px;">
+        <div style="font-size:10px;color:var(--grey);margin-bottom:4px;font-family:var(--mono);">SPEED ADVANTAGE OVER US EQUIVALENT</div>
+        <div style="font-family:var(--mono);font-size:28px;font-weight:700;color:var(--green);">1,500×</div>
+        <div style="font-size:11px;color:var(--grey);">faster than Lancium Smart Response system</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top:16px;text-align:center;">
+    <button onclick="showScene(4)" style="background:rgba(0,229,160,0.1);border:1px solid var(--green);color:var(--green);padding:12px 32px;border-radius:6px;font-family:var(--sans);font-size:13px;font-weight:700;cursor:pointer;letter-spacing:0.05em;">SEE ENERGY CAPTURED →</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- SCENE 4: ENERGY CAPTURED -->
+<!-- ══════════════════════════════════════════ -->
+<div class="scene" id="scene4">
+  <div class="scene-header">
+    <div class="act">ACT 05 — ENERGY CAPTURED</div>
+    <h2>Wasted wind becomes <span class="g">productive power.</span></h2>
+    <p>The 1MW absorbed by the Smart Buffer Array is not stored or wasted. It is immediately converted into two productive outputs — high-throughput AI compute and district heat — both delivered at zero marginal energy cost.</p>
+  </div>
+
+  <div class="grid3">
+    <div class="panel">
+      <div class="panel-label">Input</div>
+      <div class="stat">
+        <div class="stat-label">Curtailed Wind Absorbed</div>
+        <div class="stat-value green">1 MW</div>
+        <div class="stat-sub">maximum per container</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Power Source</div>
+        <div class="stat-value blue" style="font-size:18px;">Surplus Wind</div>
+        <div class="stat-sub">electricity that would otherwise be wasted</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Marginal Energy Cost</div>
+        <div class="stat-value green">£0.00</div>
+        <div class="stat-sub">the electricity is free surplus</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-label">Output 1 — Compute</div>
+      <div class="stat">
+        <div class="stat-label">Hardware</div>
+        <div class="stat-value green" style="font-size:18px;">Intel Gaudi 2</div>
+        <div class="stat-sub">immersion cooled AI accelerator array</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Primary Workload</div>
+        <div class="stat-value blue" style="font-size:16px;">NHS Diagnostic AI</div>
+        <div class="stat-sub">MRI, CT scan, mammography inference</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Secondary Workloads</div>
+        <div class="stat-value" style="font-size:14px;color:var(--grey)">Genomics · Scientific HPC</div>
+        <div class="stat-sub">batch processing during curtailment events</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-label">Output 2 — District Heat</div>
+      <div class="stat">
+        <div class="stat-label">Cooling System</div>
+        <div class="stat-value green" style="font-size:18px;">Dual Loop</div>
+        <div class="stat-sub">hydronic immersion cooling</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Thermal Output Temperature</div>
+        <div class="stat-value amber">65°C</div>
+        <div class="stat-sub">suitable for district heating integration</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Community Benefit</div>
+        <div class="stat-value green" style="font-size:16px;">Local Heating</div>
+        <div class="stat-sub">Tealing and surrounding area</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top:16px;padding:20px;background:rgba(0,229,160,0.04);border:1px solid rgba(0,229,160,0.15);border-radius:8px;">
+    <div style="font-family:var(--mono);font-size:10px;color:var(--grey);letter-spacing:0.15em;margin-bottom:12px;">CONTAINER SPECIFICATION</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;">
+      <div><div style="font-size:10px;color:var(--grey)">Format</div><div style="font-family:var(--mono);font-size:13px;color:var(--white)">20ft High Cube ISO</div></div>
+      <div><div style="font-size:10px;color:var(--grey)">Footprint</div><div style="font-family:var(--mono);font-size:13px;color:var(--white)">~160 sq ft</div></div>
+      <div><div style="font-size:10px;color:var(--grey)">Capacity</div><div style="font-family:var(--mono);font-size:13px;color:var(--white)">1MW – 1.5MW</div></div>
+      <div><div style="font-size:10px;color:var(--grey)">HV Transformer</div><div style="font-family:var(--mono);font-size:13px;color:var(--white)">External pad</div></div>
+      <div><div style="font-size:10px;color:var(--grey)">Feed into container</div><div style="font-family:var(--mono);font-size:13px;color:var(--white)">415V only</div></div>
+      <div><div style="font-size:10px;color:var(--grey)">Scalable</div><div style="font-family:var(--mono);font-size:13px;color:var(--white)">20ft → 40ft</div></div>
+    </div>
+  </div>
+
+  <div style="margin-top:16px;text-align:center;">
+    <button onclick="showScene(5)" style="background:rgba(0,229,160,0.1);border:1px solid var(--green);color:var(--green);padding:12px 32px;border-radius:6px;font-family:var(--sans);font-size:13px;font-weight:700;cursor:pointer;letter-spacing:0.05em;">SEE NHS & GOVERNMENT IMPACT →</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- SCENE 5: NHS & GOVERNMENT IMPACT -->
+<!-- ══════════════════════════════════════════ -->
+<div class="scene" id="scene5">
+  <div class="scene-header">
+    <div class="act">ACT 06 — NHS & GOVERNMENT IMPACT</div>
+    <h2>Wasted wind. <span class="g">Free NHS compute.</span><br>Cheaper bills. Replicable everywhere.</h2>
+    <p>Every megawatt of curtailed wind absorbed by the Smart Buffer Array creates measurable public benefit — at zero additional cost to the NHS, government, or bill payer.</p>
+  </div>
+
+  <div class="metric-row">
+    <div class="metric-card green">
+      <div class="mc-label">Annual NHS Compute Value</div>
+      <div class="mc-val" style="color:var(--green)">£4.38M</div>
+      <div class="mc-sub">per 1MW container per year</div>
+    </div>
+    <div class="metric-card green">
+      <div class="mc-label">NHS Imaging Jobs / Hour</div>
+      <div class="mc-val" style="color:var(--green)">60,000</div>
+      <div class="mc-sub">MRI / CT / mammography inference</div>
+    </div>
+    <div class="metric-card amber">
+      <div class="mc-label">Bill Payer Saving</div>
+      <div class="mc-val" style="color:var(--amber)">£52/yr</div>
+      <div class="mc-sub">per household if fully deployed</div>
+    </div>
+    <div class="metric-card blue">
+      <div class="mc-label">Phase 1 Ask (NIA)</div>
+      <div class="mc-val" style="color:var(--blue)">£150k</div>
+      <div class="mc-sub">feasibility study only — no deployment</div>
+    </div>
+  </div>
+
+  <div class="grid2" style="margin-top:20px;">
+    <div class="panel">
+      <div class="panel-label">Phase 1 NIA Feasibility — What We Are Asking For</div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <div style="display:flex;gap:12px;align-items:flex-start;">
+          <div style="width:24px;height:24px;border-radius:50%;background:rgba(0,229,160,0.1);border:1px solid var(--green);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--green);flex-shrink:0;">1</div>
+          <div><div style="font-size:13px;font-weight:600;margin-bottom:2px;">DIgSILENT PowerFactory Simulation</div><div style="font-size:11px;color:var(--grey)">Load flow and transient stability analysis against Tealing constraint parameters</div></div>
+        </div>
+        <div style="display:flex;gap:12px;align-items:flex-start;">
+          <div style="width:24px;height:24px;border-radius:50%;background:rgba(0,229,160,0.1);border:1px solid var(--green);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--green);flex-shrink:0;">2</div>
+          <div><div style="font-size:13px;font-weight:600;margin-bottom:2px;">Chartered Engineer Technical Report</div><div style="font-size:11px;color:var(--grey)">CEng reviewed and stamped — legally admissible engineering evidence</div></div>
+        </div>
+        <div style="display:flex;gap:12px;align-items:flex-start;">
+          <div style="width:24px;height:24px;border-radius:50%;background:rgba(0,229,160,0.1);border:1px solid var(--green);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--green);flex-shrink:0;">3</div>
+          <div><div style="font-size:13px;font-weight:600;margin-bottom:2px;">Bench Validation at MSIP Dundee</div><div style="font-size:11px;color:var(--grey)">Physical proof of sub-200ms load transfer — oscilloscope data produced</div></div>
+        </div>
+      </div>
+      <div class="alert green" style="margin-top:16px;">✓ Phase 1 requires no physical deployment at Tealing. It produces the engineering evidence to progress to a funded pilot.</div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-label">Scalability — Beyond Tealing</div>
+      <div class="stat">
+        <div class="stat-label">Scottish Curtailment Constraint Points</div>
+        <div class="stat-value green">Hundreds</div>
+        <div class="stat-sub">each a potential Smart Buffer deployment site</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Deployment Time Per Site</div>
+        <div class="stat-value green">12–18 months</div>
+        <div class="stat-sub">vs 8–10 years for grid reinforcement</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Total UK Curtailment Addressable</div>
+        <div class="stat-value amber">£1.46B/yr</div>
+        <div class="stat-sub">recoverable from bill payers</div>
+      </div>
+      <div style="margin-top:16px;padding:12px;background:rgba(0,229,160,0.04);border:1px solid rgba(0,229,160,0.15);border-radius:6px;font-size:12px;color:var(--grey);line-height:1.6;">
+        A validated Smart Buffer Array is a replicable asset. The architecture applies at any curtailment constraint point on the transmission network.
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top:24px;text-align:center;padding:24px;background:rgba(0,229,160,0.04);border:1px solid rgba(0,229,160,0.15);border-radius:8px;">
+    <div style="font-family:var(--mono);font-size:10px;color:var(--grey);letter-spacing:0.2em;margin-bottom:8px;">READY TO DISCUSS</div>
+    <div style="font-size:20px;font-weight:700;margin-bottom:8px;">Kayode Adediji — Tealing Grid Tech</div>
+    <div style="font-family:var(--mono);font-size:12px;color:var(--grey);">kayode@tealinggridtech.co.uk &nbsp;|&nbsp; Dundee, Scotland &nbsp;|&nbsp; UK IPO: GB2610235.0</div>
+  </div>
+</div>
+
+</main>
+
+<footer>
+  Architecture protected under UK IPO Application No. GB2610235.0 &nbsp;|&nbsp; Tealing Grid Tech
+</footer>
+
+<script>
+// ── SCENE NAVIGATION ──
+const scenes = document.querySelectorAll('.scene');
+const tabs = document.querySelectorAll('.story-tab');
+
+function showScene(n) {
+  scenes.forEach((s,i) => { s.classList.toggle('active', i===n); });
+  tabs.forEach((t,i) => { t.classList.toggle('active', i===n); });
+  if(n===1) startCounter();
+  else stopCounter();
+}
+
+// ── SCENE 1: LIVE COUNTER ──
+let counterInterval, sessionStart, curtailmentRate = 400;
+
+function updateScene1() {
+  const gen = +document.getElementById('s1-genSlider').value;
+  const cap = +document.getElementById('s1-capSlider').value;
+  document.getElementById('s1-gen').innerText = gen + ' MW';
+  document.getElementById('s1-cap').innerText = cap + ' MW';
+  const curtailed = Math.max(0, gen - cap);
+  curtailmentRate = curtailed;
+  document.getElementById('s1-curtailed').innerText = curtailed + ' MW';
+  const hourly = curtailed * 150;
+  document.getElementById('s1-hourly').innerText = '£' + hourly.toLocaleString() + '/hr';
+  const annual = hourly * 24 * 365;
+  document.getElementById('s1-annual').innerText = fmtBig(annual);
+}
+
+function startCounter() {
+  sessionStart = Date.now();
+  counterInterval = setInterval(() => {
+    const elapsed = (Date.now() - sessionStart) / 1000;
+    const wasted = (curtailmentRate * 150 / 3600) * elapsed;
+    document.getElementById('s1-liveCounter').innerText = '£' + wasted.toFixed(2);
+  }, 50);
+}
+
+function stopCounter() {
+  clearInterval(counterInterval);
+}
+
+// ── SCENE 2: FLOW MODE ──
+let flowMode = 0;
+
+function setFlowMode(m) {
+  flowMode = m;
+  document.getElementById('flowBtn0').className = m===0 ? 'toggle-btn active-red' : 'toggle-btn';
+  document.getElementById('flowBtn1').className = m===1 ? 'toggle-btn active-green' : 'toggle-btn';
+
+  const drop = document.getElementById('dropLine');
+  const bRect = document.getElementById('bufferRect');
+  const bTitle = document.getElementById('bufferTitle');
+  const bSub1 = document.getElementById('bufferSub1');
+  const bSub2 = document.getElementById('bufferSub2');
+  const wRect = document.getElementById('warningRect');
+  const wTxt = document.getElementById('warningTxt');
+  const c2 = document.getElementById('flowCable2');
+
+  if (m === 0) {
+    drop.style.stroke = '#ff3d5a';
+    bRect.setAttribute('stroke','#ff3d5a');
+    bTitle.setAttribute('fill','#ff3d5a'); bTitle.textContent = '⚠ WASTED ENERGY';
+    bSub1.setAttribute('fill','#ff3d5a'); bSub1.textContent = '400 MW GROUNDED';
+    bSub2.setAttribute('fill','#4a6580'); bSub2.textContent = '£60,000/hr constraint payment';
+    wRect.setAttribute('fill','#ff3d5a');
+    wTxt.setAttribute('fill','white'); wTxt.textContent = 'CURTAILMENT ACTIVE';
+    c2.style.stroke = '#ff3d5a';
+  } else {
+    drop.style.stroke = '#00e5a0';
+    bRect.setAttribute('stroke','#00e5a0');
+    bTitle.setAttribute('fill','#00e5a0'); bTitle.textContent = '✓ SMART BUFFER ACTIVE';
+    bSub1.setAttribute('fill','white'); bSub1.textContent = 'NHS AI INFERENCE RUNNING';
+    bSub2.setAttribute('fill','#4a6580'); bSub2.textContent = 'Generating 65°C district heat';
+    wRect.setAttribute('fill','#00e5a0');
+    wTxt.setAttribute('fill','#040d18'); wTxt.textContent = 'BUFFER ENGAGED';
+    c2.style.stroke = '#1e90ff';
+  }
+}
+
+// ── SCENE 3: RESPONSE DEMO ──
+function runResponseDemo() {
+  const bar = document.getElementById('responseBar');
+  const label = document.getElementById('responseLabel');
+  const steps = [
+    {pct:6, txt:'Signal received...', ms:150},
+    {pct:30, txt:'PLC processing...', ms:200},
+    {pct:65, txt:'DC buffer isolating...', ms:250},
+    {pct:100, txt:'✓ Load transfer complete — 187ms', ms:400},
+  ];
+  const tls = [document.getElementById('tl0'),document.getElementById('tl1'),document.getElementById('tl2'),document.getElementById('tl3')];
+
+  // Reset
+  bar.style.width = '0%'; label.textContent = '';
+  tls.forEach(t => { t.classList.remove('active-step'); t.querySelector('.tl-time').style.color='var(--grey)'; });
+
+  let delay = 0;
+  steps.forEach((s,i) => {
+    delay += s.ms;
+    setTimeout(() => {
+      bar.style.width = s.pct + '%';
+      label.textContent = s.txt;
+      tls[i].classList.add('active-step');
+      tls[i].querySelector('.tl-time').style.color = 'var(--green)';
+    }, delay);
+  });
+}
+
+// ── FORMATTERS ──
+function fmtBig(n) {
+  if(n>=1e9) return '£'+(n/1e9).toFixed(2)+'B';
+  if(n>=1e6) return '£'+(n/1e6).toFixed(1)+'M';
+  return '£'+n.toLocaleString();
+}
+
+// Init
+updateScene1();
+</script>
+</body>
+</html>
